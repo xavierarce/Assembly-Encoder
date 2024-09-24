@@ -4,7 +4,8 @@
     buffer db 1024 dup(0)          ; Buffer to store the data read from the file
     encodedBuffer db 1024 dup(0)   ; Buffer for storing the encoded data
     bytesRead DWORD 0              ; Number of bytes read
-    xorKey db 1Ah                  ; XOR key used for encoding
+    bytesWritten DWORD 0           ; Number of bytes written (needed for WriteFile)
+    xorKey db 1Ah, 2ah                  ; XOR key used for encoding
     originalMsg db 'Original Content: ', 0
     encodedMsg db 'Encoded Content: ', 0
     GENERIC_READ equ 80000000h
@@ -55,10 +56,11 @@ encode_loop:
     cmp ecx, edx                    ; Compare lower 32-bits of rcx with bytesRead
     jge display_original_message    ; If rcx >= bytesRead, jump to display
 
-    mov al, [rsi + rcx]             ; Load byte from original buffer
-    xor al, [rbx]                   ; XOR with the key
-    mov [rdi + rcx], al             ; Store the encoded byte in encodedBuffer
-    inc rcx                         ; Increment the counter
+    mov ax, [rsi + rcx]             ; Load byte from original buffer
+    xor ax, [rbx]                   ; XOR with the key
+    mov [rdi + rcx], ax             ; Store the encoded byte in encodedBuffer
+    inc rcx                        ; Increment the counter
+    inc rcx                        ; Increment the counter
     jmp encode_loop                 ; Loop back
 
 display_original_message:
@@ -78,7 +80,7 @@ display_encoded_message:
     XOR r9, r9                      ; hWnd = NULL
     CALL MessageBoxA                ; Call MessageBoxA to display the encoded content
 
-    ; Now, create a new file for the encoded content
+    ; Create a new file for the encoded content
     lea rcx, newFilename            ; Path to new file (RCX)
     mov rdx, GENERIC_WRITE          ; Write access (RDX)
     xor r8, r8                      ; No sharing (R8)
@@ -94,15 +96,31 @@ display_encoded_message:
     test rax, rax                   ; Check if the handle is valid
     js error_exit                   ; Exit if invalid
 
-    mov rsi, rax                    ; Save the file handle for new file
+    mov rdi, rax                    ; Save the file handle for the new file in rdi
+
+    ; Write the encoded data into the new file
+    mov rcx, rdi                    ; File handle (RCX)
+    lea rdx, encodedBuffer          ; Buffer containing the encoded content (RDX)
+    mov r8d, [bytesRead]            ; Number of bytes to write (R8) - same as bytesRead from the original file
+    lea r9, bytesWritten            ; Pointer to store the number of bytes written (R9)
+    sub rsp, 40
+    mov qword ptr [rsp+32], 0                      ; No template file
+    call WriteFile                  ; Call WriteFile to write the encoded data
+    add rsp, 40
+
+    ; Check if the write was successful
+    mov eax, [bytesWritten]         ; Load bytes written into EAX
+    cmp eax, [bytesRead]            ; Compare bytes written with bytes read
+    jne error_exit                  ; If not equal, jump to error
+
 
     ; Close the new file
-    mov rcx, rsi                    ; File handle (RCX)
+    mov rcx, rdi                    ; File handle for the new file (RCX)
     call CloseHandle                ; Call CloseHandle to close the new file
 
     ; Close the original file
-    mov rcx, rsi                    ; File handle (RCX)
-    call CloseHandle                ; Call CloseHandle to close original file
+    mov rcx, rsi                    ; File handle for the original file (RCX)
+    call CloseHandle                ; Call CloseHandle to close the original file
 
     ; Exit the process
     xor rcx, rcx                    ; Exit code 0 (RCX)
