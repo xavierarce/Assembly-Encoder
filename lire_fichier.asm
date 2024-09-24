@@ -3,7 +3,6 @@
     buffer db 1024 dup(0)          ; Buffer to store the data read from the file
     encodedBuffer db 1024 dup(0)   ; Buffer for storing the encoded data
     bytesRead DWORD 0              ; Number of bytes read
-    msgTitle db 'File Content', 0  ; Title for the MessageBox
     xorKey db 1Ah                  ; XOR key used for encoding
     originalMsg db 'Original Content: ', 0
     encodedMsg db 'Encoded Content: ', 0
@@ -51,7 +50,7 @@ Start proc
 encode_loop:
     mov edx, [bytesRead]            ; Load the value of bytesRead into edx
     cmp ecx, edx                    ; Compare lower 32-bits of rcx with bytesRead
-    jge display_message             ; If rcx >= bytesRead, jump to display
+    jge display_original_message    ; If rcx >= bytesRead, jump to display
 
     mov al, [rsi + rcx]             ; Load byte from original buffer
     xor al, [rbx]                   ; XOR with the key
@@ -59,19 +58,22 @@ encode_loop:
     inc rcx                         ; Increment the counter
     jmp encode_loop                 ; Loop back
 
-display_message:
-    ; Display the contents in a message box
+display_original_message:
+    ; Display the original content in a message box
     SUB rsp, 28h           
-
     XOR rcx, rcx            
-    LEA rdx, encodedBuffer    
-    LEA r8, encodedMsg         
-    XOR r9, r9              
-    CALL MessageBoxA        
+    LEA rdx, buffer                 ; Load the original buffer
+    LEA r8, originalMsg             ; Original content label
+    XOR r9, r9                      ; hWnd = NULL
+    CALL MessageBoxA                ; Call MessageBoxA to display the original content
 
-    XOR     rcx, rcx
-    CALL ExitProcess      
-
+display_encoded_message:
+    ; Display the encoded content in another message box
+    XOR rcx, rcx            
+    LEA rdx, encodedBuffer          ; Load the encoded buffer
+    LEA r8, encodedMsg              ; Encoded content label
+    XOR r9, r9                      ; hWnd = NULL
+    CALL MessageBoxA                ; Call MessageBoxA to display the encoded content
 
     ; Close the file
     mov rcx, rsi                    ; File handle (RCX)
