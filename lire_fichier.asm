@@ -96,14 +96,6 @@ display_encoded_message:
 
     mov rsi, rax                    ; Save the file handle for new file
 
-    ; Write the encoded data into the new file
-    mov rcx, rsi                    ; File handle (RCX)
-    lea rdx, encodedBuffer          ; Buffer with encoded content (RDX)
-    mov r8d, [bytesRead]            ; Number of bytes to write (R8)
-    lea r9, bytesRead               ; Pointer to bytes written (R9)
-    xor r10, r10                    ; No OVERLAPPED structure
-    call WriteFile                  ; Call WriteFile to write the encoded data
-
     ; Close the new file
     mov rcx, rsi                    ; File handle (RCX)
     call CloseHandle                ; Call CloseHandle to close the new file
